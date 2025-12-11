@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         学习通课程页面美化 + 搜索
-// @namespace    https://example.com/
-// @version      1.4
-// @description  保留背景图和搜索功能，降低滚动卡顿，优化性能
-// @match        *://*.chaoxing.com/*
-// @match        *://*.ecust.edu.cn/*
-// @grant        none
+// @name         学习通课程页面美化 + 搜索
+// @namespace    https://example.com/
+// @version      1.6 (深度性能优化)
+// @description  采用 GPU 优化和非重排隐藏技术，彻底解决卡顿问题
+// @match        *://*.chaoxing.com/*
+// @match        *://*.ecust.edu.cn/*
+// @grant        none
 // ==/UserScript==
 
 (function () {
@@ -26,14 +26,27 @@
     waitForList();
 
     //---------------------------------------------------
-    // 1. 页面美化（保留卡片美化、优化性能）
+    // 1. 页面美化（重点优化 GPU 渲染性能）
     //---------------------------------------------------
     function beautifyPage() {
         const css = `
+            /* 使用 opacity/visibility 隐藏，避免重排 */
+            .cx_visually_hidden {
+                opacity: 0 !important;
+                visibility: hidden !important;
+                /* 使用 transform 来平滑过渡隐藏效果 */
+                transform: scale(0.95);
+                transition: opacity 0.25s, visibility 0.25s, transform 0.25s;
+                /* 确保不占用点击空间，但仍然占用布局空间 */
+                pointer-events: none;
+            }
+
             #hlStudy #studyMenu .jwkc .wzy_couros ul {
                 display: grid !important;
                 grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
                 grid-gap: 12px !important;
+                /* 减少页面加载和滚动时的重排 */
+                align-items: stretch; 
             }
 
             #hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc] {
@@ -43,20 +56,20 @@
                 list-style: none;
                 cursor: pointer;
                 overflow: hidden;
-                background: rgba(255,255,255,0.95);
-                /* 模糊降低性能影响 */
-                backdrop-filter: blur(0.5px);
-                transition: box-shadow .25s, transform .2s;
-                /* GPU 优化 */
-                will-change: transform, opacity;
+                background: rgba(255,255,255,0.98); 
+                transition: box-shadow .25s, transform .2s, opacity .25s, visibility .25s;
+                
+                /* ！！关键优化！！强制将卡片提升为独立渲染层，交由 GPU 处理 */
+                transform: translateZ(0); 
+                will-change: transform, box-shadow, opacity; 
             }
-
+            
             #hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc]:hover {
-                box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(0,0,0,0.15); /* 稍微增大阴影，提高视觉效果 */
+                transform: translateY(-2px) translateZ(0); /* 保持 translateZ(0) */
             }
 
-            /* 背景图层 */
+            /* ... 其他保持不变或微调的样式 ... */
             .cx_bg_layer {
                 position: absolute;
                 inset: 0;
@@ -67,7 +80,6 @@
                 z-index: 1;
             }
 
-            /* 文字层 */
             .cx_text_layer {
                 position: relative;
                 z-index: 2;
@@ -88,8 +100,8 @@
                 font-size: 14px;
                 color: #444;
                 display: flex;
-                flex-direction: column; /* 强制换行显示 */
-                gap: 2px; /* 每行间距 */
+                flex-direction: column;
+                gap: 2px;
             }
 
             .wzy_couros_keshi {
@@ -113,6 +125,8 @@
                 border-radius: 6px !important;
                 font-size: 14px !important;
                 z-index: 99999 !important;
+                /* 确保搜索框自己也被提升到 GPU 层 */
+                transform: translateZ(0); 
             }
         `;
 
@@ -122,7 +136,7 @@
     }
 
     //---------------------------------------------------
-    // 2. 保留背景图功能（不改动 DOM 结构）
+    // 2. 保留背景图功能 (不变)
     //---------------------------------------------------
     function convertToBackground() {
         const items = document.querySelectorAll(
@@ -155,7 +169,7 @@
     }
 
     //---------------------------------------------------
-    // 3. 搜索框（加入防抖，减少卡顿）
+    // 3. 搜索框（使用 opacity/visibility 避免重排）
     //---------------------------------------------------
     function addSearchBox() {
         const box = document.createElement("input");
@@ -175,10 +189,12 @@
                 list.forEach(li => {
                     const title = li.querySelector(".wzy_couros_name")?.innerText.toLowerCase() || "";
                     const teacher = li.querySelector(".wzy_couros_xueyuan")?.innerText.toLowerCase() || "";
-
-                    li.style.display = (title.includes(key) || teacher.includes(key)) ? "" : "none";
+                    
+                    // 优化：使用 classList.toggle 切换 .cx_visually_hidden
+                    const isHidden = !(key === "" || title.includes(key) || teacher.includes(key));
+                    li.classList.toggle("cx_visually_hidden", isHidden);
                 });
-            }, 150); // 150ms 防抖
+            }, 100); // 防抖时间缩短到 100ms
         });
     }
 })();
