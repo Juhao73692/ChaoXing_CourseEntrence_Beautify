@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         学习通课程页面美化 + 搜索
 // @namespace    https://example.com/
-// @version      1.6 (深度性能优化)
-// @description  采用 GPU 优化和非重排隐藏技术，彻底解决卡顿问题
+// @version      2.0 (性能优化与搜索功能修复)
+// @description  整合 v1.6 优秀性能，修复搜索过滤导致的滚动距离问题。
 // @match        *://*.chaoxing.com/*
 // @match        *://*.ecust.edu.cn/*
 // @grant        none
@@ -26,27 +26,20 @@
     waitForList();
 
     //---------------------------------------------------
-    // 1. 页面美化（重点优化 GPU 渲染性能）
+    // 1. 页面美化（保留 GPU 优化，修复过滤 CSS）
     //---------------------------------------------------
     function beautifyPage() {
         const css = `
-            /* 使用 opacity/visibility 隐藏，避免重排 */
-            .cx_visually_hidden {
-                opacity: 0 !important;
-                visibility: hidden !important;
-                /* 使用 transform 来平滑过渡隐藏效果 */
-                transform: scale(0.95);
-                transition: opacity 0.25s, visibility 0.25s, transform 0.25s;
-                /* 确保不占用点击空间，但仍然占用布局空间 */
-                pointer-events: none;
+            /* 修正：使用 display: none 确保元素不占用空间，修复滚动高度 */
+            .cx_hidden_display {
+                display: none !important;
             }
 
             #hlStudy #studyMenu .jwkc .wzy_couros ul {
                 display: grid !important;
                 grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
                 grid-gap: 12px !important;
-                /* 减少页面加载和滚动时的重排 */
-                align-items: stretch; 
+                align-items: stretch;
             }
 
             #hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc] {
@@ -56,20 +49,22 @@
                 list-style: none;
                 cursor: pointer;
                 overflow: hidden;
-                background: rgba(255,255,255,0.98); 
-                transition: box-shadow .25s, transform .2s, opacity .25s, visibility .25s;
-                
-                /* ！！关键优化！！强制将卡片提升为独立渲染层，交由 GPU 处理 */
-                transform: translateZ(0); 
-                will-change: transform, box-shadow, opacity; 
-            }
-            
-            #hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc]:hover {
-                box-shadow: 0 6px 16px rgba(0,0,0,0.15); /* 稍微增大阴影，提高视觉效果 */
-                transform: translateY(-2px) translateZ(0); /* 保持 translateZ(0) */
+                background: rgba(255,255,255,0.98);
+
+                /* ！！关键修正！！ 移除与 opacity/visibility 相关的过渡，只保留 hover 效果过渡 */
+                transition: box-shadow .25s, transform .2s;
+
+                /* 保留 v1.6 的 GPU 优化 */
+                transform: translateZ(0);
+                will-change: transform, box-shadow;
             }
 
-            /* ... 其他保持不变或微调的样式 ... */
+            #hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc]:hover {
+                box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+                transform: translateY(-2px) translateZ(0);
+            }
+
+            /* 背景图层 */
             .cx_bg_layer {
                 position: absolute;
                 inset: 0;
@@ -80,6 +75,7 @@
                 z-index: 1;
             }
 
+            /* 文字层 */
             .cx_text_layer {
                 position: relative;
                 z-index: 2;
@@ -126,7 +122,7 @@
                 font-size: 14px !important;
                 z-index: 99999 !important;
                 /* 确保搜索框自己也被提升到 GPU 层 */
-                transform: translateZ(0); 
+                transform: translateZ(0);
             }
         `;
 
@@ -169,7 +165,7 @@
     }
 
     //---------------------------------------------------
-    // 3. 搜索框（使用 opacity/visibility 避免重排）
+    // 3. 搜索框（修复过滤逻辑，使用 display: none）
     //---------------------------------------------------
     function addSearchBox() {
         const box = document.createElement("input");
@@ -189,12 +185,14 @@
                 list.forEach(li => {
                     const title = li.querySelector(".wzy_couros_name")?.innerText.toLowerCase() || "";
                     const teacher = li.querySelector(".wzy_couros_xueyuan")?.innerText.toLowerCase() || "";
-                    
-                    // 优化：使用 classList.toggle 切换 .cx_visually_hidden
+
                     const isHidden = !(key === "" || title.includes(key) || teacher.includes(key));
-                    li.classList.toggle("cx_visually_hidden", isHidden);
+
+                    // 修正：使用 cx_hidden_display 类 (display: none)
+                    li.classList.toggle("cx_hidden_display", isHidden);
+
                 });
-            }, 100); // 防抖时间缩短到 100ms
+            }, 100); // 100ms 防抖
         });
     }
 })();
