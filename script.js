@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         学习通课程页面美化 + 搜索（背景图透明版）
+// @name         学习通课程页面美化 + 搜索
 // @namespace    https://example.com/
-// @version      1.3
-// @description  使用课程缩略图作为背景图（透明度0.2），添加搜索框并优化布局与卡片美化
+// @version      1.4
+// @description  保留背景图和搜索功能，降低滚动卡顿，优化性能
 // @match        *://*.chaoxing.com/*
 // @match        *://*.ecust.edu.cn/*
 // @grant        none
@@ -26,7 +26,7 @@
     waitForList();
 
     //---------------------------------------------------
-    // 1. 页面美化（卡片阴影、圆角、悬停）
+    // 1. 页面美化（保留卡片美化、优化性能）
     //---------------------------------------------------
     function beautifyPage() {
         const css = `
@@ -44,8 +44,11 @@
                 cursor: pointer;
                 overflow: hidden;
                 background: rgba(255,255,255,0.95);
-                backdrop-filter: blur(2px);
+                /* 模糊降低性能影响 */
+                backdrop-filter: blur(0.5px);
                 transition: box-shadow .25s, transform .2s;
+                /* GPU 优化 */
+                will-change: transform, opacity;
             }
 
             #hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc]:hover {
@@ -71,7 +74,7 @@
                 display: flex;
                 flex-direction: column;
                 justify-content: flex-start;
-                gap: 4px;
+                gap: 2px;
             }
 
             .wzy_couros_name {
@@ -84,6 +87,9 @@
             .wzy_couros_xueyuan {
                 font-size: 14px;
                 color: #444;
+                display: flex;
+                flex-direction: column; /* 强制换行显示 */
+                gap: 2px; /* 每行间距 */
             }
 
             .wzy_couros_keshi {
@@ -116,7 +122,7 @@
     }
 
     //---------------------------------------------------
-    // 2. 把每个 li 的缩略图读取为背景图
+    // 2. 保留背景图功能（不改动 DOM 结构）
     //---------------------------------------------------
     function convertToBackground() {
         const items = document.querySelectorAll(
@@ -149,7 +155,7 @@
     }
 
     //---------------------------------------------------
-    // 3. 搜索框
+    // 3. 搜索框（加入防抖，减少卡顿）
     //---------------------------------------------------
     function addSearchBox() {
         const box = document.createElement("input");
@@ -157,18 +163,22 @@
         box.placeholder = "搜索标题或教师…";
         document.body.appendChild(box);
 
+        let timer;
         box.addEventListener("input", () => {
-            const key = box.value.trim().toLowerCase();
-            const list = document.querySelectorAll(
-                "#hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc]"
-            );
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                const key = box.value.trim().toLowerCase();
+                const list = document.querySelectorAll(
+                    "#hlStudy #studyMenu .jwkc .wzy_couros ul li[kcenc]"
+                );
 
-            list.forEach(li => {
-                const title = li.querySelector(".wzy_couros_name")?.innerText.toLowerCase() || "";
-                const teacher = li.querySelector(".wzy_couros_xueyuan")?.innerText.toLowerCase() || "";
+                list.forEach(li => {
+                    const title = li.querySelector(".wzy_couros_name")?.innerText.toLowerCase() || "";
+                    const teacher = li.querySelector(".wzy_couros_xueyuan")?.innerText.toLowerCase() || "";
 
-                li.style.display = (title.includes(key) || teacher.includes(key)) ? "" : "none";
-            });
+                    li.style.display = (title.includes(key) || teacher.includes(key)) ? "" : "none";
+                });
+            }, 150); // 150ms 防抖
         });
     }
 })();
